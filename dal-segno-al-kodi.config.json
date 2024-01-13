@@ -1,0 +1,17 @@
+{
+    "kodi" : {
+        "jsonrpc-uri" : "http://kodi.domain.local:8080/jsonrpc",
+        "authorization" : {
+            "username" : "kodi",
+            "password" : "Basic Base64EncodedStringUsername:Password"
+        }
+    },
+    "discogs" : {
+        "authorization" : {
+            "personal-access-token" : "..."
+        }
+    },
+    "nas" : {
+        "path" : "smb://nas.domain.local/data/music/"
+    }
+}
