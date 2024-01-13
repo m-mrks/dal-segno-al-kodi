@@ -3,8 +3,11 @@ import discogs_client
 import requests
 import json
 
+with open('dal-segno-al-kodi.config.json','r') as dal_segno_al_kodi_config_json:
+    config = json.load(dal_segno_al_kodi_config_json)
+
 def search_my_discogs_collection_for_barcode(scan):
-    d = discogs_client.Client('DalSegnoAlKodi/0.1', user_token='discogs-api-token-code...')
+    d = discogs_client.Client('DalSegnoAlKodi/0.1', user_token=config['discogs']['authorization']['personal-access-token'])
     me = d.identity()
     releases = d.search(scan)
     if (releases):
@@ -13,7 +16,10 @@ def search_my_discogs_collection_for_barcode(scan):
                 release_instances = me.collection_items(release)
                 for instance in release_instances:
                     if (instance):
-                        return release
+                        for collection_folder in me.collection_folders:
+                            if collection_folder.id == instance.folder_id:
+                                instance_collection_folder_name = collection_folder.name
+                        return release, instance_collection_folder_name
                     else:
                         message = f'Discogs found releases for {scan}, but that release was not in the collection.'
                         raise LookupError(message)
@@ -23,6 +29,7 @@ def search_my_discogs_collection_for_barcode(scan):
 
 def generate_path(release):
     artist = release.artists_sort.upper()
+    artist = artist.replace("DJ ","")
     artist = artist.replace(" FEATURING ", " ft. ")
     artist = artist.replace(" FEAT. ", " ft. ")
     artist = artist.replace(" VS. ", " vs. ")
@@ -32,18 +39,18 @@ def generate_path(release):
     return(directory_name)
 
 def play_kodi(discogs_folder, path):
-    headers = {'Authorization': 'Basic ...'}
-    directory = 'smb://nas.domain.local/data/music/' + discogs_folder + '/' + path
+    headers = {'Authorization': config['kodi']['authorization']['password']}
+    directory = config['nas']['path'] + discogs_folder + '/' + path
     pythondatastructure = { 'jsonrpc': '2.0', 'id': 1, 'method': 'Player.Open', 'params': { 'item': { 'directory': directory }}}
-    response = requests.post('http://kodi.domain.local:8080/jsonrpc', data=json.dumps(pythondatastructure), headers=headers)
+    uri = config['kodi']['jsonrpc-uri']
+    response = requests.post(uri, data=json.dumps(pythondatastructure), headers=headers)
     return response
 
 app = Flask(__name__)
 
 @app.route('/scan/<barcode>')
 def scanned_barcode(barcode):
-    release = search_my_discogs_collection_for_barcode(scan=barcode)
+    release, discogs_folder = search_my_discogs_collection_for_barcode(scan=barcode)
     directory_name = generate_path(release)
-    response = play_kodi(discogs_folder='Singles',path=directory_name)
-    return f'<h1>Dal Segno Al Kodi</h1><code>{directory_name}</code><p>{response}</p>'
-
+    response = play_kodi(discogs_folder=discogs_folder,path=directory_name)
+    return f'<h1>Dal Segno Al Kodi</h1><code>{discogs_folder} - {directory_name}</code><p>{response}</p>'
